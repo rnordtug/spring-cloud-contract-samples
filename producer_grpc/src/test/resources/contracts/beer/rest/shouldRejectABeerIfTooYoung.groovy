@@ -19,17 +19,18 @@ then:
 """)
 	request {
 		method 'POST'
-		url 'beer.BeerService/check'
+		url '/beer.BeerService/check'
 		body(fileAsBytes("PersonToCheck_too_young.bin"))
 		headers {
-			contentType("application/x-protobuf")
+			contentType("application/grpc")
+			header("te", "trailers")
 		}
 	}
 	response {
 		status 200
 		body(fileAsBytes("Response_too_young.bin"))
 		headers {
-			contentType("application/x-protobuf")
+			contentType("application/grpc")
 		}
 	}
 }

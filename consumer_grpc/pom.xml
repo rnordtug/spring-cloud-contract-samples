@@ -2,42 +2,48 @@
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<groupId>com.example</groupId>
-	<artifactId>beer-api-producer-grpc</artifactId>
+	<artifactId>beer-api-consumer-grpc</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>Producer GRPC</name>
-	<description>beer-api-producer-grpc</description>
+
+	<name>Consumer-GRPC</name>
+	<description>Demo project for Spring Boot</description>
+
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>2.4.0-SNAPSHOT</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<java.version>1.8</java.version>
+		<spring-cloud.version>2020.0.0-SNAPSHOT</spring-cloud.version>
+		<jackson-dataformat-xml.version>2.9.8</jackson-dataformat-xml.version>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>net.devh</groupId>
-			<artifactId>grpc-server-spring-boot-starter</artifactId>
+			<artifactId>grpc-client-spring-boot-starter</artifactId>
 			<version>2.10.1.RELEASE</version>
 		</dependency>
+
 		<dependency>
-			<groupId>com.google.protobuf</groupId>
-			<artifactId>protobuf-java</artifactId>
-			<version>3.12.2</version>
-		</dependency>
-		<dependency>
-			<groupId>com.squareup.okhttp3</groupId>
-			<artifactId>okhttp</artifactId>
-			<version>4.8.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.asarkar.grpc</groupId>
-			<artifactId>grpc-test</artifactId>
-			<version>1.0.3</version>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<!-- For compatibility -->
@@ -46,19 +52,30 @@
 			<artifactId>junit-jupiter-engine</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- remove::start[] -->
+		<!-- tag::stubrunner[] -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-contract-verifier</artifactId>
+			<artifactId>spring-cloud-starter-contract-stub-runner</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- end::stubrunner[] -->
+		<!-- remove::end[] -->
 	</dependencies>
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<java.version>1.8</java.version>
-		<spring-cloud.version>2020.0.0-SNAPSHOT</spring-cloud.version>
-		<spring-cloud-contract.version>3.0.0-SNAPSHOT</spring-cloud-contract.version>
-	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<build>
 		<extensions>
 			<extension>
@@ -91,8 +108,7 @@
 						</goals>
 						<configuration>
 							<sources>
-								<source>${project.build.directory}/generated/source/proto/main/grpc</source>
-								<source>${project.build.directory}/generated/source/proto/main/java</source>
+								<source>${project.build.directory}/generated-sources/java/</source>
 							</sources>
 						</configuration>
 					</execution>
@@ -103,7 +119,7 @@
 				<artifactId>protobuf-maven-plugin</artifactId>
 				<version>0.6.1</version>
 				<configuration>
-					<protocArtifact>com.google.protobuf:protoc:3.12.3:exe:${os.detected.classifier}</protocArtifact>
+					<protocArtifact>com.google.protobuf:protoc:3.12.0:exe:${os.detected.classifier}</protocArtifact>
 					<pluginId>grpc-java</pluginId>
 					<pluginArtifact>io.grpc:protoc-gen-grpc-java:1.32.1:exe:${os.detected.classifier}</pluginArtifact>
 				</configuration>
@@ -116,35 +132,8 @@
 					</execution>
 				</executions>
 			</plugin>
-			<!-- remove::start[] -->
-			<!-- SPRING CLOUD CONTRACT -->
-			<!-- tag::test_dep_in_plugin[] -->
-			<plugin>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-contract-maven-plugin</artifactId>
-				<version>${spring-cloud-contract.version}</version>
-				<extensions>true</extensions>
-				<configuration>
-					<testMode>CUSTOM</testMode>
-					<testFramework>JUNIT5</testFramework>
-					<packageWithBaseClasses>com.example</packageWithBaseClasses>
-				</configuration>
-			</plugin>
-			<!-- end::test_dep_in_plugin[] -->
-			<!-- remove::end[] -->
 		</plugins>
 	</build>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 
 	<repositories>
 		<repository>
@@ -206,4 +195,5 @@
 			</snapshots>
 		</pluginRepository>
 	</pluginRepositories>
+
 </project>

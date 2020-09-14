@@ -8,5 +8,5 @@ set -o pipefail
 
 echo "Generating proto files"
 mkdir -p target/generated-sources/java
-target/protoc/bin/protoc --java_out=target/generated/source/proto/main/java src/main/proto/beer.proto
+target/protoc/bin/protoc --java_out=target/generated-sources/java src/main/resources/proto/beer.proto
 echo "Proto files generated!"

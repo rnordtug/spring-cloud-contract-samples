@@ -25,3 +25,7 @@ public class ProducerController extends BeerServiceGrpc.BeerServiceImplBase {
 		responseObserver.onCompleted();
 	}
 }
+
+interface PersonCheckingService {
+	boolean shouldGetBeer(PersonToCheck request);
+}

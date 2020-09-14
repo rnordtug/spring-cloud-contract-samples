@@ -26,7 +26,7 @@ apply plugin: 'spring-cloud-contract'
 // remove::end[]
 apply plugin: 'maven-publish'
 
-group = 'com.abhinav'
+group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 sourceCompatibility = '1.8'
 
@@ -65,6 +65,15 @@ dependencies {
 	testImplementation("org.springframework.cloud:spring-cloud-starter-contract-verifier")
 	// end::verifier_dep[]
 	// remove::end[]
+}
+
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from components.java
+		}
+	}
 }
 
 protobuf {
@@ -121,6 +130,6 @@ test {
 contracts {
 	testFramework = "JUNIT5"
 	packageWithBaseClasses = 'com.example'
-	testMode = "EXPLICIT"
+	testMode = "CUSTOM"
 }
 // remove::end[]
