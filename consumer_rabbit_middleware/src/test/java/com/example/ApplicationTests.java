@@ -22,15 +22,24 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.assertj.core.api.BDDAssertions;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.KafkaContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+// remove::start[]
 import org.springframework.cloud.contract.stubrunner.StubTrigger;
 import org.springframework.cloud.contract.stubrunner.spring.AutoConfigureStubRunner;
 import org.springframework.cloud.contract.stubrunner.spring.StubRunnerProperties;
@@ -38,30 +47,28 @@ import org.springframework.cloud.contract.verifier.converter.YamlContract;
 import org.springframework.cloud.contract.verifier.messaging.MessageVerifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.support.MessageBuilder;
+// remove::end[]
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, classes = {TestConfig.class, Application.class})
-@AutoConfigureStubRunner(ids = "com.example:beer-api-producer-kafka-middleware", stubsMode = StubRunnerProperties.StubsMode.LOCAL)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, classes = { TestConfig.class, Application.class })
+// remove::start[]
+@AutoConfigureStubRunner(ids = "com.example:beer-api-producer-rabbit-middleware", stubsMode = StubRunnerProperties.StubsMode.LOCAL)
 @Testcontainers
+// remove::end[]
 @ActiveProfiles("test")
 public class ApplicationTests {
 
-	@Container
-	static KafkaContainer kafka = new KafkaContainer();
+	@Container static RabbitMQContainer rabbit = new RabbitMQContainer();
 
 	@DynamicPropertySource
-	static void kafkaProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+	static void rabbitProperties(DynamicPropertyRegistry registry) {
+		rabbit.start();
+		registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
 	}
 
-
+	// remove::start[]
 	@Autowired
 	StubTrigger trigger;
 	@Autowired
@@ -76,34 +83,48 @@ public class ApplicationTests {
 			BDDAssertions.then(this.application.storedFoo.getFoo()).contains("example");
 		});
 	}
+	// remove::end[]
 
 }
 
 @Configuration
 class TestConfig {
 
+	private static final Logger log = LoggerFactory.getLogger(TestConfig.class);
+
 	@Bean
-	MessageVerifier<Message<?>> standaloneMessageVerifier(KafkaTemplate kafkaTemplate) {
-		return new MessageVerifier<Message<?>>() {
+	MessageVerifier<Message> testMessageVerifier(RabbitTemplate rabbitTemplate) {
+		return new MessageVerifier<Message>() {
 			@Override
-			public Message<?> receive(String destination, long timeout, TimeUnit timeUnit, @Nullable YamlContract contract) {
+			public Message receive(String destination, long timeout, TimeUnit timeUnit, @Nullable YamlContract contract) {
 				return null;
 			}
 
 			@Override
-			public Message<?> receive(String destination, YamlContract contract) {
+			public Message receive(String destination, YamlContract contract) {
 				return null;
 			}
 
 			@Override
-			public void send(Message<?> message, String destination, @Nullable YamlContract contract) {
+			public void send(Message message, String destination, @Nullable YamlContract contract) {
+					rabbitTemplate.send(destination, message);
 			}
 
 			@Override
 			public <T> void send(T payload, Map<String, Object> headers, String destination, @Nullable YamlContract contract) {
 				Map<String, Object> newHeaders = headers != null ? new HashMap<>(headers) : new HashMap<>();
-				newHeaders.put(KafkaHeaders.TOPIC, destination);
-				kafkaTemplate.send(MessageBuilder.createMessage(payload, new MessageHeaders(newHeaders)));
+				MessageProperties messageProperties = new MessageProperties();
+				newHeaders.forEach(messageProperties::setHeader);
+				String routingKey = "#";
+				messageProperties.setReceivedRoutingKey(routingKey);
+				log.info("Sending a message to destination [{}] with routing key [{}]", destination, routingKey);
+				try {
+					Message message = MessageBuilder.withBody(new ObjectMapper().writeValueAsBytes(payload)).andProperties(messageProperties).build();
+					send(message, destination, contract);
+				}
+				catch (JsonProcessingException e) {
+					throw new IllegalStateException(e);
+				}
 			}
 		};
 	}

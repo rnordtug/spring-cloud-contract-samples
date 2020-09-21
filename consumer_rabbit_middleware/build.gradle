@@ -38,17 +38,17 @@ dependencies {
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.kafka:spring-kafka")
+	implementation("org.springframework.amqp:spring-rabbit")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.awaitility:awaitility:3.1.6")
 	testImplementation("org.testcontainers:junit-jupiter:1.14.3")
-	testImplementation("org.testcontainers:kafka:1.14.3")
-
+	testImplementation("org.testcontainers:rabbitmq:1.14.3")
+	//remove::start[]
 	// tag::verifier_dep[]
 	testImplementation("org.springframework.cloud:spring-cloud-starter-contract-stub-runner")
 	// end::verifier_dep[]
-
+	// remove::end[]
 
 	// for compatibility
 	testImplementation('org.junit.jupiter:junit-jupiter-engine')

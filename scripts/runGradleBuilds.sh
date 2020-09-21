@@ -102,6 +102,7 @@ function build_gradle() {
     build producer_kotlin_ftw
     build producer_kafka
     build producer_kafka_middleware
+    build producer_rabbit_middleware
     build producer_graphql
     build producer_grpc
     waitPids
@@ -126,6 +127,7 @@ function build_gradle() {
     build consumer_kotlin_ftw
     build consumer_kafka
     build consumer_kafka_middleware
+    build consumer_rabbit_middleware
     build consumer_with_secured_webflux
     build consumer_pact
     build consumer_grpc
