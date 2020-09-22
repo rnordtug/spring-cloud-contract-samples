@@ -49,8 +49,6 @@ dependencies {
 	testImplementation("org.testcontainers:junit-jupiter:1.14.3")
 	testImplementation("org.testcontainers:rabbitmq:1.14.3")
 
-	testImplementation("org.apache.camel.springboot:camel-rabbitmq-starter:${camelVersion}")
-
 	// tag::verifier_dep[]
 	testImplementation("org.springframework.cloud:spring-cloud-starter-contract-verifier")
 	// end::verifier_dep[]

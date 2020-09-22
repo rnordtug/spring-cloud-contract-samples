@@ -17,17 +17,11 @@
 package com.example;
 
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
-import org.apache.camel.CamelContext;
-import org.apache.camel.ConsumerTemplate;
-import org.apache.camel.Exchange;
-import org.apache.camel.Message;
-import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.ExchangeBuilder;
-import org.apache.camel.support.DefaultMessage;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
@@ -37,6 +31,14 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.contract.verifier.converter.YamlContract;
@@ -47,6 +49,8 @@ import org.springframework.cloud.contract.verifier.messaging.internal.ContractVe
 import org.springframework.cloud.contract.verifier.util.ContractVerifierUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -58,10 +62,7 @@ import org.springframework.util.StringUtils;
 @Testcontainers
 @AutoConfigureMessageVerifier
 @ActiveProfiles("test")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public abstract class BaseClass {
-
-	private static final Logger log = LoggerFactory.getLogger(BaseClass.class);
 
 	@Container
 	static RabbitMQContainer rabbit = new RabbitMQContainer();
@@ -69,51 +70,10 @@ public abstract class BaseClass {
 	@DynamicPropertySource
 	static void rabbitProperties(DynamicPropertyRegistry registry) {
 		registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
-		registry.add("camel.component.rabbitmq.port-number", rabbit::getAmqpPort);
 	}
 
 	@Autowired
 	Controller controller;
-	@Autowired
-	RabbitMessageVerifier rabbitMessageVerifier;
-	@Autowired
-	CamelContext camelContext;
-
-	@BeforeEach
-	public void setup(TestInfo testInfo) {
-		setupMessagingFromContract(testInfo);
-	}
-
-	private void setupMessagingFromContract(TestInfo testInfo) {
-		try {
-			YamlContract contract = ContractVerifierUtil.contract(this, testInfo.getDisplayName());
-			setupMessagingIfPresent(contract);
-		}
-		catch (Exception e) {
-			log.warn("An exception occurred while trying to setup messaging from contract", e);
-		}
-		this.camelContext.getShutdownStrategy().setTimeout(1);
-	}
-
-	private void setupMessagingIfPresent(YamlContract contract) {
-		if (contract.input == null && contract.outputMessage == null) {
-			return;
-		}
-		if (contract.input != null && StringUtils.hasText(contract.input.messageFrom)) {
-			setupConnection(contract.input.messageFrom, contract);
-		}
-		if (contract.outputMessage != null && StringUtils.hasText(contract.outputMessage.sentTo)) {
-			setupConnection(contract.outputMessage.sentTo, contract);
-		}
-	}
-
-	private void setupConnection(String destination, YamlContract contract) {
-		if (StringUtils.isEmpty(destination)) {
-			return;
-		}
-		log.info("Setting up destination [{}]", destination);
-		this.rabbitMessageVerifier.receive(destination, 100, TimeUnit.MILLISECONDS, contract);
-	}
 
 	public void trigger() {
 		this.controller.sendFoo("example");
@@ -124,8 +84,8 @@ public abstract class BaseClass {
 class TestConfig {
 
 	@Bean
-	RabbitMessageVerifier rabbitTemplateMessageVerifier(ConsumerTemplate consumerTemplate, ProducerTemplate producerTemplate) {
-		return new RabbitMessageVerifier(consumerTemplate, producerTemplate);
+	RabbitMessageVerifier rabbitTemplateMessageVerifier() {
+		return new RabbitMessageVerifier();
 	}
 
 	@Bean
@@ -137,10 +97,31 @@ class TestConfig {
 				if (receive == null) {
 					return null;
 				}
-				return new ContractVerifierMessage(receive.getBody(), receive.getHeaders());
+				return new ContractVerifierMessage(receive.getPayload(), receive.getHeaders());
 			}
 
 		};
+	}
+
+	@Bean
+	MessageConverter messageConverter() {
+		return new Jackson2JsonMessageConverter();
+	}
+
+	@Bean
+	Exchange myExchange() {
+		return new TopicExchange("topic1");
+	}
+
+	@Bean
+	Queue myQueue() {
+		return new Queue("topic1");
+	}
+
+	@Bean
+	Binding myBinding() {
+		return BindingBuilder.bind(myQueue()).to(myExchange())
+				.with("#").noargs();
 	}
 
 }
@@ -149,30 +130,22 @@ class RabbitMessageVerifier implements MessageVerifier<Message> {
 
 	private static final Logger log = LoggerFactory.getLogger(RabbitMessageVerifier.class);
 
-	private final ConsumerTemplate consumerTemplate;
-
-	private final ProducerTemplate producerTemplate;
-
-	RabbitMessageVerifier(ConsumerTemplate consumerTemplate, ProducerTemplate producerTemplate) {
-		this.consumerTemplate = consumerTemplate;
-		this.producerTemplate = producerTemplate;
-	}
+	private final LinkedBlockingQueue<Message> queue = new LinkedBlockingQueue<>();
 
 	@Override
 	public Message receive(String destination, long timeout, TimeUnit timeUnit, @Nullable YamlContract contract) {
-		Exchange receive = consumerTemplate.receive(rabbitUrl(destination), timeUnit.toMillis(timeout));
-		log.info("Received a message! [{}]", receive);
-		if (receive == null) {
-			return null;
+		try {
+			return queue.poll(timeout, timeUnit);
 		}
-		return receive.getIn();
+		catch (InterruptedException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
-	@NotNull
-	private String rabbitUrl(String destination) {
-		String url = "rabbitmq://" + destination + "?queue=" + destination + "&routingKey=#";
-		log.info("Rabbit URL [{}]", url);
-		return url;
+	@RabbitListener(id = "foo", queues = "topic1")
+	public void listen(org.springframework.messaging.Message message) {
+		log.info("Got a message! [{}]", message);
+		queue.add(message);
 	}
 
 	@Override
@@ -182,17 +155,11 @@ class RabbitMessageVerifier implements MessageVerifier<Message> {
 
 	@Override
 	public void send(Message message, String destination, @Nullable YamlContract contract) {
-		Exchange exchange = ExchangeBuilder.anExchange(producerTemplate.getCamelContext()).build();
-		exchange.setIn(message);
-		producerTemplate.send(rabbitUrl(destination), exchange);
-		log.info("Sent a message! [{}]", exchange);
+
 	}
 
 	@Override
 	public void send(Object payload, Map headers, String destination, @Nullable YamlContract contract) {
-		DefaultMessage defaultMessage = new DefaultMessage(producerTemplate.getCamelContext());
-		defaultMessage.setHeaders(headers);
-		defaultMessage.setBody(payload);
-		send(defaultMessage, destination, contract);
+
 	}
 }

@@ -7,6 +7,9 @@ Contract.make {
 	}
 	outputMessage {
 		sentTo("topic1")
+		headers {
+			header("amqp_receivedRoutingKey", "#")
+		}
 		body([
 		        foo: "example"
 		])

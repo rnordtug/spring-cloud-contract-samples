@@ -115,9 +115,7 @@ class TestConfig {
 				Map<String, Object> newHeaders = headers != null ? new HashMap<>(headers) : new HashMap<>();
 				MessageProperties messageProperties = new MessageProperties();
 				newHeaders.forEach(messageProperties::setHeader);
-				String routingKey = "#";
-				messageProperties.setReceivedRoutingKey(routingKey);
-				log.info("Sending a message to destination [{}] with routing key [{}]", destination, routingKey);
+				log.info("Sending a message to destination [{}] with routing key", destination);
 				try {
 					Message message = MessageBuilder.withBody(new ObjectMapper().writeValueAsBytes(payload)).andProperties(messageProperties).build();
 					send(message, destination, contract);
